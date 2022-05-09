@@ -16,7 +16,7 @@ permit.docに、「当アーカイブ・ファイルの内容に一切の変更�
 
 ### 作成方法
 ```
-python ../script/normalize.py butah014/buta014.dic > buta.txt
+python ../script/normalize.py ../butah014/buta014.dic > buta.txt
 ```
 
 ## wikipedia.txt
@@ -50,6 +50,8 @@ python ../script/normalize.py dic-nico-intersection-pixiv.txt --ime  > nico-pixi
 ## yojijukugo.txt
 [漢字四文字言葉集](http://nikolist.jpn.org/puzzle/kanjinuke/)を加工したもの。
 
+なお、誤字（「ん」が「ｎ」になっている）を1カ所直している。
+
 ### ライセンスについて
 yojijukugo.txt は[CC BY-NC-SA 2.1 JP](https://creativecommons.org/licenses/by-nc-sa/2.1/jp/)に準拠する。
 元データがこのライセンスに準拠しているため。
@@ -59,7 +61,17 @@ yojijukugo.txt は[CC BY-NC-SA 2.1 JP](https://creativecommons.org/licenses/by-n
 
 ### 作成方法
 ```
-wget http://nikolist.jpn.org/puzzle/kanjinuke/yojijukugo.txt -o yoji.txt
+wget http://nikolist.jpn.org/puzzle/kanjinuke/yojijukugo.txt -O yoji.txt
 nkf --overwrite -w yoji.txt
-python3 normalize.py -k2 yoji.txt > yojijukugo.txt
+python3 ../script/normalize.py -k2 yoji.txt > yojijukugo.txt
 ```
+
+## all.txt
+上記のリストをすべてまとめたリスト。
+
+### 作成方法
+```
+cat *.txt > cat.txt
+python3 ../script/normalize.py cat.txt > all.txt
+```
+

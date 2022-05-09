@@ -7,6 +7,8 @@ wikipedia_yomi.pyで抽出する。
 抽出された言葉は規格化されていないので、normalize.pyにかけて言葉リストにする。
 
 ```
+wget https://dumps.wikimedia.org/jawiki/latest/jawiki-latest-abstract.xml.gz
+gzip -d jawiki-latest-abstract.xml.gz
 python wikipedia_yomi.py jawiki-latest-abstract.xml > wp.dat
-python ../normalize.py wp.dat > ../list/wikipedia.txt
+python ../script/normalize.py wp.dat > ../list/wikipedia.txt
 ```

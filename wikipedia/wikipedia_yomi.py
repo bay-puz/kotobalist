@@ -3,6 +3,7 @@ import argparse
 import re
 from sys import stderr
 from bs4 import BeautifulSoup
+from typing import Tuple
 
 
 # 項目名・読み仮名に使われるかな文字
@@ -135,7 +136,7 @@ def find_title(xml_line: str) -> str:
     return ''
 
 
-def parse_abstract(xml_line: str, title: str) -> (bool, str):
+def parse_abstract(xml_line: str, title: str) -> Tuple[bool, str]:
     soup = BeautifulSoup(xml_line, 'lxml-xml')
 
     abst = soup.find('abstract')

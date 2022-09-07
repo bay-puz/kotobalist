@@ -27,7 +27,7 @@ wikipedia.txtはCC-BY-SAで公開する。
 元データであるWikipediaのライセンスがCC-BY-SAであるため。
 
 ### 作成方法
-[wikipedia/README](wikipedia/README.md) を参考。
+[script/README](script/README.md) を参考。
 
 
 ## nico-pixiv.txt
@@ -71,7 +71,7 @@ python3 ../script/normalize.py -k2 yoji.txt > yojijukugo.txt
 
 ### 作成方法
 ```
-cat *.txt > cat.txt
-python3 ../script/normalize.py cat.txt > all.txt
+cat *.txt > cat.dat
+python3 ../script/normalize.py cat.dat > all.txt
 ```
 

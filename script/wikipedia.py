@@ -62,16 +62,17 @@ def get_yomigana_in_template(body: str, title: str) -> Tuple[bool, str]:
     """
     body = body.replace(' ', '').replace('　', '')
     regexs = [r'^\|(?:よみがな|nativename)=(.+)$', r'^\|name=\{\{ruby\|.+?\|(.+?)(\}\}|\|)']
-
+    comp_count = 0
     for regex in regexs:
         comp = re.compile(regex, re.MULTILINE)
+        comp_count += 1
         searched = comp.search(body)
         if searched is None:
             continue
         yomigana = searched.group(1)
         if is_kana_word(yomigana):
             if DEBUG:
-                print(f'template({regex}): {title} -> {yomigana}', file=stderr)
+                print(f'template(comp={comp_count}): {title} -> {yomigana}', file=stderr)
             return True, yomigana
     return False, ''
 
@@ -103,17 +104,22 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
     """
 
     escaped = re.escape(title)
-    comp = re.compile(r'[「『]?\'\'\'[「『]?' + escaped + r'[」』]?\'\'\'[」』]?(?:<ref.+?>)?（(?:.*?、)?\'*' + f'({KANA}+)' + r'\'*.*?）(.*)')
+    comp_count = 1
+    comp = re.compile(r'\'\'\'' + escaped + r'\'\'\'（' + f'({KANA}+)' + r'）(.+)')
+    comp_detail = re.compile(r'[「『]?\'\'\'[「『]?' + escaped + r'[」』]?\'\'\'[」』]?(?:<ref.+?>)?（\'*' + f'({KANA}+)' + r'\'*.*?）(.*)')
+ 
     searched = comp.search(body)
-
     if searched is None:
-        return False, 'no paranthesis'
+        searched = comp_detail.search(body)
+        comp_count += 1
+        if searched is None:
+            return False, 'no parenthesis'
 
     after = searched.group(2)
     if after is not None:
         comp_deha = re.compile(r'((一覧)?(の記事)?では|の一覧)')
-        search_deha = comp_deha.match(after)
-        if search_deha is not None:
+        searched_deha = comp_deha.match(after)
+        if searched_deha is not None:
             return False, 'there is deha'
 
     yomi = searched.group(1)
@@ -124,12 +130,12 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
         for delimitor in delimitors:
             if re.search(delimitor, title):
                 continue
-            searched = re.search(delimitor, yomi)
-            if searched:
-                yomi = yomi[:searched.start()]
+            searched_d = re.search(delimitor, yomi)
+            if searched_d:
+                yomi = yomi[:searched_d.start()]
                 continue
     if DEBUG:
-        print(f'parenthesis: {title} -> {yomi}', file=stderr)
+        print(f'parenthesis(comp={comp_count}): {title} -> {yomi}', file=stderr)
     return True, yomi
 
 
@@ -171,7 +177,7 @@ def get_yomi(title: str, body: str) -> bool:
         return True
 
     if DEBUG:
-        print(f"failed({yomi}): {title}", file=stderr)
+        print(f"failed({yomi}): {title}", file=stderr)            
     return False
 
 

@@ -6,7 +6,8 @@ from bs4 import BeautifulSoup
 from sys import stderr
 from typing import Tuple
 
-
+DEBUG = True
+DEBUG_LEN = 10
 KANA = '[ぁ-ヿ 　＝、，,。〜~！？!?⁉‼⁈★☆♡♪♂♀-]'
 
 def is_kana(char: str) -> bool:
@@ -36,7 +37,10 @@ def is_worthful_title(word: str) -> bool:
     denied_patterns = [r'.+一覧', r'.+年表', r'.+順リスト']
     denied_patterns += [r'[0-9]+月[0-9]+日', r'[0-9]+年']
     denied_patterns += [r'[0-9]+年代', r'(紀元前)?[0-9]+(世|千年)紀']
-    denied_patterns += [r'Category:.+', r'Wikipedia:.+', r'Help:.+', r'プロジェクト:.+', r'ファイル:.+']
+    categories = ['Category', 'Wikipedia','Help', 'Template', 'Portal', 'プロジェクト', 'ファイル']
+    for cat in categories:
+        denied_patterns.append(cat + r':.+')
+
     for pat in denied_patterns:
         if re.fullmatch(pat, word):
             return False
@@ -52,7 +56,7 @@ def trim_title(word: str) -> str:
     return re.sub(trim_pattern, '', word)
 
 
-def get_yomigana_in_template(body: str) -> Tuple[bool, str]:
+def get_yomigana_in_template(body: str, title: str) -> Tuple[bool, str]:
     """
     Templateの"よみがな"などから読み仮名を取り出す
     """
@@ -66,6 +70,8 @@ def get_yomigana_in_template(body: str) -> Tuple[bool, str]:
             continue
         yomigana = searched.group(1)
         if is_kana_word(yomigana):
+            if DEBUG:
+                print(f'template({regex}): {title} -> {yomigana}', file=stderr)
             return True, yomigana
     return False, ''
 
@@ -82,6 +88,8 @@ def get_yomigana_in_meta(body: str, title: str) -> Tuple[bool, str]:
     yomigana = searched.group(1)
     if not is_kana_word(yomigana):
         return False, ''
+    if DEBUG:
+        print(f'meta: {title} -> {yomigana}', file=stderr)
     return True, yomigana
 
 
@@ -95,7 +103,7 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
     """
 
     escaped = re.escape(title)
-    comp = re.compile(r'[「『]?\'\'\'[「『]?' + escaped + r'[」』]?\'\'\'[」』]?(?:<ref.+?>)?（(?:.*?、)?\'*' + f'({KANA}+)' + r'\'*.*?）(.*)', re.DOTALL)
+    comp = re.compile(r'[「『]?\'\'\'[「『]?' + escaped + r'[」』]?\'\'\'[」』]?(?:<ref.+?>)?（(?:.*?、)?\'*' + f'({KANA}+)' + r'\'*.*?）(.*)')
     searched = comp.search(body)
 
     if searched is None:
@@ -120,28 +128,30 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
             if searched:
                 yomi = yomi[:searched.start()]
                 continue
-
+    if DEBUG:
+        print(f'parenthesis: {title} -> {yomi}', file=stderr)
     return True, yomi
 
 
 def get_yomi(title: str, body: str) -> bool:
     title = trim_title(title)
     if not is_worthful_title(title):
-        print(f"not worthful: {title}")
+        print(f"not worthful: {title}", file=stderr)
         return False
 
     if is_kana_word(title):
-        print(f"kana word: {title}")
+        print(title)
+        print(f"kana-word {title}", file=stderr)
         return True
 
-    is_ok, yomi = get_yomigana_in_template(body)
+    is_ok, yomi = get_yomigana_in_template(body, title)
     if is_ok:
-        print(f"template: {yomi}")
+        print(yomi)
         return True
 
     is_ok, yomi = get_yomigana_in_meta(body, title)
     if is_ok:
-        print(f"metadata: {yomi}")
+        print(yomi)
         return True
 
     def _reduce(text: str) -> str:
@@ -157,9 +167,11 @@ def get_yomi(title: str, body: str) -> bool:
 
     is_ok, yomi = get_yomi_by_parenthesis(_reduce(body), title)
     if is_ok:
-        print(f"by parenthesis: {yomi}")
+        print(yomi)
         return True
 
+    if DEBUG:
+        print(f"failed({yomi}): {title}", file=stderr)
     return False
 
 
@@ -173,6 +185,9 @@ def load_index(file_name: str) -> list:
                 continue
             pos_list.append(pos)
 
+            if DEBUG:
+                if len(pos_list) > DEBUG_LEN:
+                    return pos_list
         return pos_list
 
 
@@ -186,7 +201,8 @@ def load_file(file_name: str, index_list: list) -> list:
                 block_len = index_list[i+1] - offset
                 blocks.append(file.read(block_len))
             else: 
-                blocks.append(file.read())
+                if not DEBUG:
+                    blocks.append(file.read())
     return blocks
 
 
@@ -214,12 +230,14 @@ def main():
     args = parser.parse_args()
 
     index_list = load_index(args.index)
+    print(f'pages: {len(index_list)}*100', file=stderr)
 
     blocks = load_file(args.file, index_list)
     sum = 0
     for block in blocks:
         count = read_xml(block)
-        print(f'word: {count}', file=stderr)
+        if DEBUG:
+            print(f'word = {count}', file=stderr)
         sum += count
     print(f'sum: {sum}', file=stderr)
 

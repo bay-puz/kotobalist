@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from sys import stderr
 from typing import Tuple
 
-DEBUG = True
+DEBUG = False
 DEBUG_LEN = 10
 KANA = '[ぁ-ヿ 　＝、，,。〜~！？!?⁉‼⁈★☆♡♪♂♀-]'
 
@@ -18,6 +18,8 @@ def is_kana(char: str) -> bool:
 
 
 def is_kana_word(word: str) -> bool:
+    if len(word) == 0:
+        return False
     for char in word:
         if not is_kana(char):
             return False
@@ -37,7 +39,7 @@ def is_worthful_title(word: str) -> bool:
     denied_patterns = [r'.+一覧', r'.+年表', r'.+順リスト']
     denied_patterns += [r'[0-9]+月[0-9]+日', r'[0-9]+年']
     denied_patterns += [r'[0-9]+年代', r'(紀元前)?[0-9]+(世|千年)紀']
-    categories = ['Category', 'Wikipedia','Help', 'Template', 'Portal', 'プロジェクト', 'ファイル']
+    categories = ['Category', 'Wikipedia','Help', 'Template', 'Portal', 'MediaWiki', 'プロジェクト', 'ファイル']
     for cat in categories:
         denied_patterns.append(cat + r':.+')
 
@@ -47,12 +49,20 @@ def is_worthful_title(word: str) -> bool:
     return True
 
 
+def is_redirect(body: str) -> bool:
+    """
+    リダイレクトかどうかを判定する
+    """
+    searched = re.match(re.escape('#REDIRECT'), body)
+    return (searched is not None)
+
+
 def trim_title(word: str) -> str:
     """
-    titleタグから余分な文字を削る
+    titleから余分な文字を削る
     - " (曖昧さ回避)"のように括弧があれば削る
     """
-    trim_pattern = r'[ 　]?[（\(].+[）\)]'
+    trim_pattern = r'[ 　]?[（\(].+[）\)]$'
     return re.sub(trim_pattern, '', word)
 
 
@@ -61,7 +71,7 @@ def get_yomigana_in_template(body: str, title: str) -> Tuple[bool, str]:
     Templateの"よみがな"などから読み仮名を取り出す
     """
     body = body.replace(' ', '').replace('　', '')
-    regexs = [r'^\|(?:よみがな|nativename)=(.+)$', r'^\|name=\{\{ruby\|.+?\|(.+?)(\}\}|\|)']
+    regexs = [r'^\|(?:読み仮名|振り仮名|よみがな|ふりがな|nativename|kana)=(.+)$', r'^\|name=\{\{ruby\|.+?\|(.+?)(\}\}|\|)']
     comp_count = 0
     for regex in regexs:
         comp = re.compile(regex, re.MULTILINE)
@@ -74,23 +84,23 @@ def get_yomigana_in_template(body: str, title: str) -> Tuple[bool, str]:
             if DEBUG:
                 print(f'template(comp={comp_count}): {title} -> {yomigana}', file=stderr)
             return True, yomigana
-    return False, ''
+    return False, 'no yomigana in template'
 
 
 
-def get_yomigana_in_meta(body: str, title: str) -> Tuple[bool, str]:
+def get_yomigana_in_infobox(body: str, title: str) -> Tuple[bool, str]:
     """
     '{{読み仮名|'''漢字'''|ふりがな|...}}'という書式から読み仮名を取り出す
     """
     comp = re.compile(r'\{\{読み仮名.*?\|\'\'\'' + re.escape(title) + r'\'\'\'\|(.+?)(\}\}|\|)')
     searched = comp.search(body)
     if searched is None:
-       return False, ''
+       return False, 'no yomigana in infobox'
     yomigana = searched.group(1)
     if not is_kana_word(yomigana):
-        return False, ''
+        return False, 'not kana word in infobox'
     if DEBUG:
-        print(f'meta: {title} -> {yomigana}', file=stderr)
+        print(f'infobox: {title} -> {yomigana}', file=stderr)
     return True, yomigana
 
 
@@ -101,6 +111,7 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
         項目名が語ではないことが多いので除外する
     - 読み仮名と閉じ括弧のあいだに"、"などで区切られた別の語がある場合は削る
         - ただし、項目名にその区切りの記号が含まれる場合は削らない
+    - "かな漢字（-かんじ）"といった書き方の場合は除外する
     """
 
     escaped = re.escape(title)
@@ -115,14 +126,16 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
         if searched is None:
             return False, 'no parenthesis'
 
+    yomi = searched.group(1)
+    if yomi[0:1] == '-':
+        return False, 'start with hyphen'
+
     after = searched.group(2)
     if after is not None:
         comp_deha = re.compile(r'((一覧)?(の記事)?では|の一覧)')
         searched_deha = comp_deha.match(after)
         if searched_deha is not None:
             return False, 'there is deha'
-
-    yomi = searched.group(1)
 
     comp_delimitor = re.compile(r'([、，,・]|もしくは|または)')
     delimitors = ['、', '，', ',', '・', 'もしくは', 'または']
@@ -134,9 +147,13 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
             if searched_d:
                 yomi = yomi[:searched_d.start()]
                 continue
-    if DEBUG:
-        print(f'parenthesis(comp={comp_count}): {title} -> {yomi}', file=stderr)
-    return True, yomi
+    
+    if is_kana_word(yomi):
+        if DEBUG:
+            print(f'parenthesis(comp={comp_count}): {title} -> {yomi}', file=stderr)
+        return True, yomi
+    
+    return False, 'not kana in parenthesis'
 
 
 def get_yomi(title: str, body: str) -> bool:
@@ -147,15 +164,20 @@ def get_yomi(title: str, body: str) -> bool:
 
     if is_kana_word(title):
         print(title)
-        print(f"kana-word {title}", file=stderr)
+        if DEBUG:
+            print(f"kana-word: {title}", file=stderr)
         return True
+
+    if is_redirect(body):
+        print(f"redirect: {title}", file=stderr)
+        return False
 
     is_ok, yomi = get_yomigana_in_template(body, title)
     if is_ok:
         print(yomi)
         return True
 
-    is_ok, yomi = get_yomigana_in_meta(body, title)
+    is_ok, yomi = get_yomigana_in_infobox(body, title)
     if is_ok:
         print(yomi)
         return True
@@ -163,11 +185,11 @@ def get_yomi(title: str, body: str) -> bool:
     def _reduce(text: str) -> str:
         text = text.replace(' ', '').replace('　', '')
         text = text.replace('(', '（').replace(')', '）')
-        comp_metadata = re.compile(r'\{\{.+?\}\}')
-        comp_metadata_lines = re.compile(r'\{\{.+?\}\}', re.DOTALL)
+        comp_infobox = re.compile(r'\{\{.+?\}\}')
+        comp_infobox_lines = re.compile(r'\{\{.+?\}\}', re.DOTALL)
         comp_template = re.compile(r'^\|.+?$', re.MULTILINE)
-        text = comp_metadata.sub('', text)
-        text = comp_metadata_lines.sub('', text)
+        text = comp_infobox.sub('', text)
+        text = comp_infobox_lines.sub('', text)
         text = comp_template.sub('', text)
         return text
 
@@ -176,8 +198,7 @@ def get_yomi(title: str, body: str) -> bool:
         print(yomi)
         return True
 
-    if DEBUG:
-        print(f"failed({yomi}): {title}", file=stderr)            
+    print(f"failed({yomi}): {title}", file=stderr)            
     return False
 
 

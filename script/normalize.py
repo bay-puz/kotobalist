@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import argparse
+from sys import stderr
+from typing import Tuple
 
 
 def load(file_name: str, key_pos: int = -1, is_ime: bool = False) -> list:
@@ -41,7 +43,7 @@ def kata_to_hira(word: str) -> str:
 def convert_hira(word: str) -> str:
     word = kata_to_hira(word)
 
-    def _convert_v(char: str, char_next: str) -> (str, str):
+    def _convert_v(char: str, char_next: str) -> Tuple[str, str]:
         if char != 'ゔ':
             return char, char_next
         str_a = 'ぁぃぇぉ'
@@ -60,7 +62,7 @@ def convert_hira(word: str) -> str:
             return char
         return str_daku[str_sei.index(char)]
 
-    def _convert_odoriji(char_pre: str, char: str) -> (str, str):
+    def _convert_odoriji(char_pre: str, char: str) -> Tuple[str, str]:
         odoriji = 'ゝヽゞヾ'
         if len(char) == 0 or char not in odoriji:
             return char_pre, char
@@ -122,12 +124,19 @@ def main():
     words = []
     for word in loads:
         words.append(convert_hira(word))
+    print(f'all words: {len(words)}', file=stderr)
 
     words = sort_len(words)
+    print(f'unique words: {len(words)}', file=stderr)
+
+    words_ng_n = 0
     for word in words:
         if len(word) < 2:
+            words_ng_n += 1
             continue
         print(word)
+    print(f'short words: {words_ng_n}', file=stderr)
+    print(f'words: {len(words) - words_ng_n}', file=stderr)
 
 
 if __name__ == '__main__':

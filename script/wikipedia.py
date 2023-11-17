@@ -8,7 +8,7 @@ from typing import Tuple
 
 DEBUG = False
 DEBUG_LEN = 10
-KANA = '[ぁ-ヿ 　＝、，,。〜~！？!?⁉‼⁈★☆♡♪♂♀-「」『』]'
+KANA = '[ぁ-ヿ 　＝、，,。.・／/～〜~！？!?⁉‼⁈★☆♡♪♂♀×「」『』…－―-]'
 
 
 def is_kana(char: str) -> bool:
@@ -137,8 +137,8 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
         if searched_deha is not None:
             return False, 'there is deha'
 
-    comp_delimitor = re.compile(r'([、，,・]|もしくは|または)')
-    delimitors = ['、', '，', ',', '・', 'もしくは', 'または']
+    comp_delimitor = re.compile(r'([、，,・。/／]|もしくは|または|あるいは)')
+    delimitors = ['、', '，', ',', '・', '。', '/', '／', 'もしくは', 'または', 'あるいは']
     if comp_delimitor.search(yomi):
         for delimitor in delimitors:
             if re.search(delimitor, title):

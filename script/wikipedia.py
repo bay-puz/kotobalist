@@ -8,7 +8,8 @@ from typing import Tuple
 
 DEBUG = False
 DEBUG_LEN = 10
-KANA = '[ぁ-ヿ 　＝、，,。〜~！？!?⁉‼⁈★☆♡♪♂♀-]'
+KANA = '[ぁ-ヿ 　＝、，,。.・／/～〜~！？!?⁉‼⁈★☆♡♪♂♀×「」『』…－―-]'
+
 
 def is_kana(char: str) -> bool:
     """
@@ -39,7 +40,7 @@ def is_worthful_title(word: str) -> bool:
     denied_patterns = [r'.+一覧', r'.+年表', r'.+順リスト']
     denied_patterns += [r'[0-9]+月[0-9]+日', r'[0-9]+年']
     denied_patterns += [r'[0-9]+年代', r'(紀元前)?[0-9]+(世|千年)紀']
-    categories = ['Category', 'Wikipedia','Help', 'Template', 'Portal', 'MediaWiki', 'プロジェクト', 'ファイル']
+    categories = ['Category', 'Wikipedia', 'Help', 'Template', 'Portal', 'MediaWiki', 'プロジェクト', 'ファイル']
     for cat in categories:
         denied_patterns.append(cat + r':.+')
 
@@ -87,7 +88,6 @@ def get_yomigana_in_template(body: str, title: str) -> Tuple[bool, str]:
     return False, 'no yomigana in template'
 
 
-
 def get_yomigana_in_infobox(body: str, title: str) -> Tuple[bool, str]:
     """
     '{{読み仮名|'''漢字'''|ふりがな|...}}'という書式から読み仮名を取り出す
@@ -95,7 +95,7 @@ def get_yomigana_in_infobox(body: str, title: str) -> Tuple[bool, str]:
     comp = re.compile(r'\{\{読み仮名.*?\|\'\'\'' + re.escape(title) + r'\'\'\'\|(.+?)(\}\}|\|)')
     searched = comp.search(body)
     if searched is None:
-       return False, 'no yomigana in infobox'
+        return False, 'no yomigana in infobox'
     yomigana = searched.group(1)
     if not is_kana_word(yomigana):
         return False, 'not kana word in infobox'
@@ -118,7 +118,7 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
     comp_count = 1
     comp = re.compile(r'\'\'\'' + escaped + r'\'\'\'（' + f'({KANA}+)' + r'）(.+)')
     comp_detail = re.compile(r'[「『]?\'\'\'[「『]?' + escaped + r'[」』]?\'\'\'[」』]?(?:<ref.+?>)?（\'*' + f'({KANA}+)' + r'\'*.*?）(.*)')
- 
+
     searched = comp.search(body)
     if searched is None:
         searched = comp_detail.search(body)
@@ -137,8 +137,8 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
         if searched_deha is not None:
             return False, 'there is deha'
 
-    comp_delimitor = re.compile(r'([、，,・]|もしくは|または)')
-    delimitors = ['、', '，', ',', '・', 'もしくは', 'または']
+    comp_delimitor = re.compile(r'([、，,・。/／]|もしくは|または|あるいは)')
+    delimitors = ['、', '，', ',', '・', '。', '/', '／', 'もしくは', 'または', 'あるいは']
     if comp_delimitor.search(yomi):
         for delimitor in delimitors:
             if re.search(delimitor, title):
@@ -147,12 +147,12 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
             if searched_d:
                 yomi = yomi[:searched_d.start()]
                 continue
-    
+
     if is_kana_word(yomi):
         if DEBUG:
             print(f'parenthesis(comp={comp_count}): {title} -> {yomi}', file=stderr)
         return True, yomi
-    
+
     return False, 'not kana in parenthesis'
 
 
@@ -198,7 +198,7 @@ def get_yomi(title: str, body: str) -> bool:
         print(yomi)
         return True
 
-    print(f"failed({yomi}): {title}", file=stderr)            
+    print(f"failed({yomi}): {title}", file=stderr)
     return False
 
 
@@ -225,9 +225,9 @@ def load_file(file_name: str, index_list: list) -> list:
             offset = index_list[i]
             file.seek(offset)
             if i + 1 < len(index_list):
-                block_len = index_list[i+1] - offset
+                block_len = index_list[i + 1] - offset
                 blocks.append(file.read(block_len))
-            else: 
+            else:
                 if not DEBUG:
                     blocks.append(file.read())
     return blocks
@@ -268,7 +268,7 @@ def main():
         sum += count
     print(f'sum: {sum}', file=stderr)
 
-    return 
+    return
 
 
 if __name__ == '__main__':

@@ -8,11 +8,11 @@ from sys import stderr
 def gen_dict(words: list) -> dict:
     len_dict = {}
     for pos, word in enumerate(words):
-        l = len(word)
-        if l in len_dict:
-            len_dict[l]["count"] += 1
+        word_l = len(word)
+        if word_l in len_dict:
+            len_dict[word_l]["count"] += 1
         else:
-            len_dict[l] = {"length": l, "start": pos, "count": 1}
+            len_dict[word_l] = {"length": word_l, "start": pos, "count": 1}
     return len_dict
 
 
@@ -36,6 +36,7 @@ def main():
 
     print(json.dumps(index_dict))
     return
+
 
 if __name__ == '__main__':
     main()

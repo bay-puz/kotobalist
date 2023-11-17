@@ -89,16 +89,16 @@ def convert_hira(word: str) -> str:
     i = 0
     while i < len(word_l):
         char = word_l[i]
-        char_next = '' if i + 1 >= len(word_l) else word_l[i+1]
+        char_next = '' if i + 1 >= len(word_l) else word_l[i + 1]
         char, char_next = _convert_v(char, char_next)
         char, char_next = _convert_odoriji(char, char_next)
         word_l[i] = char
         if i + 1 < len(word_l):
             if len(char_next) == 0:
-                word_l.pop(i+1)
+                word_l.pop(i + 1)
                 i -= 1
             else:
-                word_l[i+1] = char_next
+                word_l[i + 1] = char_next
         i += 1
 
     converted = ''

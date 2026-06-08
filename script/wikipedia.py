@@ -6,8 +6,6 @@ from bs4 import BeautifulSoup
 from sys import stderr
 from typing import Tuple
 
-DEBUG = False
-DEBUG_LEN = 10
 KANA = '[ぁ-ヿ 　＝、，,。.・／/～〜~！？!?⁉‼⁈★☆♡♪♂♀×「」『』…－―-]'
 
 
@@ -82,8 +80,6 @@ def get_yomigana_in_template(body: str, title: str) -> Tuple[bool, str]:
             continue
         yomigana = searched.group(1)
         if is_kana_word(yomigana):
-            if DEBUG:
-                print(f'template(comp={comp_count}): {title} -> {yomigana}', file=stderr)
             return True, yomigana
     return False, 'no yomigana in template'
 
@@ -99,8 +95,6 @@ def get_yomigana_in_infobox(body: str, title: str) -> Tuple[bool, str]:
     yomigana = searched.group(1)
     if not is_kana_word(yomigana):
         return False, 'not kana word in infobox'
-    if DEBUG:
-        print(f'infobox: {title} -> {yomigana}', file=stderr)
     return True, yomigana
 
 
@@ -118,6 +112,19 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
     comp_count = 1
     comp = re.compile(r'\'\'\'' + escaped + r'\'\'\'（' + f'({KANA}+)' + r'）(.+)')
     comp_detail = re.compile(r'[「『]?\'\'\'[「『]?' + escaped + r'[」』]?\'\'\'[」』]?(?:<ref.+?>)?（\'*' + f'({KANA}+)' + r'\'*.*?）(.*)')
+
+    def _reduce(text: str) -> str:
+        text = text.replace(' ', '').replace('　', '')
+        text = text.replace('(', '（').replace(')', '）')
+        comp_infobox = re.compile(r'\{\{.+?\}\}')
+        comp_infobox_lines = re.compile(r'\{\{.+?\}\}', re.DOTALL)
+        comp_template = re.compile(r'^\|.+?$', re.MULTILINE)
+        text = comp_infobox.sub('', text)
+        text = comp_infobox_lines.sub('', text)
+        text = comp_template.sub('', text)
+        return text
+    
+    body = _reduce(body)
 
     searched = comp.search(body)
     if searched is None:
@@ -149,58 +156,35 @@ def get_yomi_by_parenthesis(body: str, title: str) -> Tuple[bool, str]:
                 continue
 
     if is_kana_word(yomi):
-        if DEBUG:
-            print(f'parenthesis(comp={comp_count}): {title} -> {yomi}', file=stderr)
         return True, yomi
 
     return False, 'not kana in parenthesis'
 
 
-def get_yomi(title: str, body: str) -> bool:
+def get_yomi(title: str, body: str) -> Tuple[bool, str]:
     title = trim_title(title)
     if not is_worthful_title(title):
-        print(f"not worthful: {title}", file=stderr)
-        return False
+        return False, 'not worthful'
 
     if is_kana_word(title):
-        print(title)
-        if DEBUG:
-            print(f"kana-word: {title}", file=stderr)
-        return True
+        return True, title
 
     if is_redirect(body):
-        print(f"redirect: {title}", file=stderr)
-        return False
+        return False, 'redirect'
 
     is_ok, yomi = get_yomigana_in_template(body, title)
     if is_ok:
-        print(yomi)
-        return True
+        return True, yomi
 
     is_ok, yomi = get_yomigana_in_infobox(body, title)
     if is_ok:
-        print(yomi)
-        return True
+        return True, yomi
 
-    def _reduce(text: str) -> str:
-        text = text.replace(' ', '').replace('　', '')
-        text = text.replace('(', '（').replace(')', '）')
-        comp_infobox = re.compile(r'\{\{.+?\}\}')
-        comp_infobox_lines = re.compile(r'\{\{.+?\}\}', re.DOTALL)
-        comp_template = re.compile(r'^\|.+?$', re.MULTILINE)
-        text = comp_infobox.sub('', text)
-        text = comp_infobox_lines.sub('', text)
-        text = comp_template.sub('', text)
-        return text
-
-    is_ok, yomi = get_yomi_by_parenthesis(_reduce(body), title)
+    is_ok, yomi = get_yomi_by_parenthesis(body, title)
     if is_ok:
-        print(yomi)
-        return True
+        return True, yomi
 
-    print(f"failed({yomi}): {title}", file=stderr)
-    return False
-
+    return False, 'failed to extract yomi'
 
 def load_index(file_name: str) -> list:
     with open(file_name) as file:
@@ -212,9 +196,6 @@ def load_index(file_name: str) -> list:
                 continue
             pos_list.append(pos)
 
-            if DEBUG:
-                if len(pos_list) > DEBUG_LEN:
-                    return pos_list
         return pos_list
 
 
@@ -227,13 +208,10 @@ def load_file(file_name: str, index_list: list) -> list:
             if i + 1 < len(index_list):
                 block_len = index_list[i + 1] - offset
                 blocks.append(file.read(block_len))
-            else:
-                if not DEBUG:
-                    blocks.append(file.read())
     return blocks
 
 
-def read_xml(block: str) -> int:
+def extract_yomi_from_xml(block: str) -> int:
     xml = bz2.decompress(block).decode(encoding="utf-8")
     soup = BeautifulSoup("<root>" + xml + "</root>", 'xml')
 
@@ -244,8 +222,12 @@ def read_xml(block: str) -> int:
     for i, t in enumerate(title_list):
         title = str(t.string)
         body = str(text_list[i].string)
-        if get_yomi(title, body):
+        is_ok, yomi = get_yomi(title, body)
+        if is_ok:
+            print(yomi)
             count += 1
+        else:
+            print(f'{title} ({yomi})', file=stderr)
 
     return count
 
@@ -262,9 +244,7 @@ def main():
     blocks = load_file(args.file, index_list)
     sum = 0
     for block in blocks:
-        count = read_xml(block)
-        if DEBUG:
-            print(f'word = {count}', file=stderr)
+        count = extract_yomi_from_xml(block)
         sum += count
     print(f'sum: {sum}', file=stderr)
 
